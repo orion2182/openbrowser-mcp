@@ -14,6 +14,48 @@ const meta = (n) => ({ "anthropic/maxResultSizeChars": n });
 
 export const TOOLS = [
   {
+    name: "network_guard_configure",
+    description:
+      "Installs an immutable, expiring, exact-origin pre-request guard on a new about:blank MCP tab. Owned-lab control planes only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tabId: num,
+        guardId: str,
+        expiresAt: num,
+        allowedOrigins: arr,
+        allowedMethods: arr,
+        maxRequests: num,
+        scopeSha256: str,
+        egressPolicySha256: str,
+      },
+      required: [
+        "tabId", "guardId", "expiresAt", "allowedOrigins", "allowedMethods",
+        "maxRequests", "scopeSha256", "egressPolicySha256",
+      ],
+    },
+    _meta: meta(8000),
+  },
+  {
+    name: "network_guard_status",
+    description: "Reads the non-secret state of an installed pre-request tab guard.",
+    inputSchema: {
+      type: "object",
+      properties: { tabId: num, guardId: str },
+      required: ["tabId", "guardId"],
+    },
+    _meta: meta(8000),
+  },
+  {
+    name: "browser_guard_capabilities",
+    description: "Reports whether a connected browser extension supports the immutable pre-request guard.",
+    inputSchema: {
+      type: "object",
+      properties: { browserId: str },
+    },
+    _meta: meta(4000),
+  },
+  {
     name: "tabs_context_mcp",
     description:
       "MCP windows with windowId, incognito flag and tab IDs. Call first if you have no tabId.",

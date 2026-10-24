@@ -3,6 +3,7 @@
 // within a CDP session, and OOPIFs each get their own. Hence the three-part key.
 
 import { cdp, ensureAttached, ensureDomain } from "./cdp.js";
+import { isGuardedTab } from "./request-guard.js";
 import { getIdentity } from "./identity.js";
 
 const ROOT = "root"; // stand-in sessionId for the tab's own session
@@ -38,6 +39,7 @@ function keyOf(browserId, sessionId, backendNodeId) {
 // Auto-attach is not recursive: setting it on a session only surfaces that session's
 // direct OOPIF children, so it has to be re-issued on every new level.
 async function autoAttachAll(tabId) {
+  const guarded = await isGuardedTab(tabId);
   const issued = new Set();
   let level = [undefined];
   for (let depth = 0; depth < 4 && level.length; depth++) {
@@ -46,7 +48,7 @@ async function autoAttachAll(tabId) {
         await cdp(
           tabId,
           "Target.setAutoAttach",
-          { autoAttach: true, flatten: true, waitForDebuggerOnStart: false },
+          { autoAttach: true, flatten: true, waitForDebuggerOnStart: guarded },
           sessionId
         );
       } catch {}

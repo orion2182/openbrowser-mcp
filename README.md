@@ -47,8 +47,9 @@ A few things worth knowing:
 - **Incognito** windows are supported, but all of them share one session: separate windows give you
   separate tab groups, not separate logins. Use separate profiles for isolated cookie jars.
 
-> **Heads up:** this drives a real browser holding your real sessions, with `debugger` and
-> `<all_urls>` permissions, and there is no approval prompt — whatever the agent asks for happens.
+> **Heads up:** unguarded tabs drive a real browser holding your real sessions, with `debugger` and
+> `<all_urls>` permissions, and there is no approval prompt. A control plane can install the
+> immutable `network_guard_configure` policy on a new `about:blank` MCP tab before navigation.
 
 ## Installation
 
@@ -126,7 +127,13 @@ the extension loaded. `./install.sh --uninstall` starts over.
 
 ## Tools
 
-20 tools. `tabs_context_mcp` gives you a `tabId`; everything else takes one.
+23 tools. `tabs_context_mcp` gives you a `tabId`; everything else takes one.
+
+| Guarded execution | |
+|---|---|
+| `network_guard_configure` | One-way, expiring exact-origin HTTP(S) guard for a new blank tab. Uses CDP Fetch plus session-scoped DNR; only bounded owned-lab methods are accepted. |
+| `network_guard_status` | Non-secret policy/budget/deny counters for an installed tab guard. |
+| `browser_guard_capabilities` | Broker-side proof that the selected connected extension was reloaded with guard support. |
 
 | Tabs | |
 |---|---|
@@ -164,6 +171,19 @@ the extension loaded. `./install.sh --uninstall` starts over.
 | `browser_select` | Pin one browser as this session's default. |
 
 Downloads land in `./source/` relative to your cwd — add it to your `.gitignore`.
+
+### Guarded owned-lab tabs
+
+`network_guard_configure` must be the first operation on a newly created `about:blank` tab. The
+policy accepts only exact IP-literal HTTP(S) origins, `GET`/`HEAD`/`OPTIONS`/`POST`, a short expiry,
+and a bounded request count. It is immutable: there is no MCP disable or widening tool. CDP Fetch
+pauses each matching request before contact; redirects are evaluated as new requests, service
+workers are bypassed, child targets inherit the guard before resuming, HTTP authentication and
+downloads are denied, and popups are closed. Session-scoped Declarative Net Request rules provide
+a second block-all/allow-exact-origin boundary if the debugger or extension worker is disrupted.
+Detaching the debugger closes the guarded tab. DNS names are intentionally rejected because an
+existing browser profile cannot provide the same connection pinning as the control plane's curl
+broker; use the explicitly scoped VM IP.
 
 ## License
 

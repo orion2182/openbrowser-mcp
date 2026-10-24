@@ -7,6 +7,7 @@ import { getIdentity, setLabel } from "./lib/identity.js";
 import { detach, attachedTabIds } from "./lib/cdp.js";
 import * as net from "./lib/net.js";
 import * as refs from "./lib/refs.js";
+import * as guard from "./lib/request-guard.js";
 import { handlers as coreHandlers } from "./lib/tools.core.js";
 import * as page from "./lib/tools.page.js";
 import { handlers as sourcesHandlers } from "./lib/tools.sources.js";
@@ -98,6 +99,7 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
   const tabId = source.tabId;
   if (tabId == null) return;
 
+  guard.onCdpEvent(tabId, method, params, source.sessionId).catch(() => {});
   net.onCdpEvent(tabId, method, params, source.sessionId);
   page.onCdpEvent?.(tabId, method, params, source.sessionId);
 
@@ -119,6 +121,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   detach(tabId).catch(() => {});
   net.clear(tabId);
   refs.invalidate(tabId);
+  guard.onTabRemoved(tabId).catch(() => {});
   schedulePush();
 });
 
@@ -131,12 +134,17 @@ chrome.windows.onRemoved.addListener((windowId) => {
 
 // User dismissed the debugger bar, or Chrome detached us on its own.
 chrome.debugger.onDetach.addListener((source) => {
-  if (source.tabId != null) detach(source.tabId).catch(() => {});
+  if (source.tabId != null) {
+    guard.onDebuggerDetach(source.tabId).catch(() => {});
+    detach(source.tabId).catch(() => {});
+  }
 });
 
-for (const event of [chrome.tabs.onCreated, chrome.tabs.onAttached, chrome.tabs.onDetached]) {
-  event.addListener(() => schedulePush());
-}
+chrome.tabs.onCreated.addListener((tab) => {
+  guard.onTabCreated(tab).catch(() => {});
+  schedulePush();
+});
+for (const event of [chrome.tabs.onAttached, chrome.tabs.onDetached]) event.addListener(() => schedulePush());
 // groupId is the only tab update that can change MCP membership; ignore the URL/status churn.
 chrome.tabs.onUpdated.addListener((_tabId, info) => {
   if (info.groupId !== undefined) schedulePush();

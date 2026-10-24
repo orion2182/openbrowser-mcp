@@ -3,6 +3,7 @@
 import { ensureAttached, ensureDomain, cdp, captureScreenshot, detach, setViewport, CAPTURE_W, CAPTURE_H } from "./cdp.js";
 import { snapshotRefs, resolveRefForAction, formatRef } from "./refs.js";
 import { contexts, syncContexts, contextOfTab, resolveContext, isInGroup, formatTabContext } from "./contexts.js";
+import * as requestGuard from "./request-guard.js";
 
 const DEFAULT_MAX_CHARS = 20000;
 const SNAPSHOT_MAX_CHARS = 2000;
@@ -269,6 +270,32 @@ const SET_VALUE_FN = `function(value) {
 }`;
 
 export const handlers = {
+  async browser_guard_capabilities() {
+    const payload = {
+      extensionVersion: chrome.runtime.getManifest().version,
+      preRequestGuardVersion: 1,
+      supported: true,
+    };
+    return text(`BROWSER_GUARD=${JSON.stringify(payload)}`);
+  },
+
+  async network_guard_configure(args) {
+    const tabId = Number(args.tabId);
+    if (!(await isInGroup(tabId))) return notInGroup(tabId);
+    const result = await requestGuard.configure(tabId, args);
+    return text(`NETWORK_GUARD=${JSON.stringify(result)}`);
+  },
+
+  async network_guard_status(args) {
+    const tabId = Number(args.tabId);
+    if (!(await isInGroup(tabId))) return notInGroup(tabId);
+    const result = await requestGuard.status(tabId);
+    if (args.guardId && result.guardId !== args.guardId) {
+      throw new Error("network guard id does not match the installed policy");
+    }
+    return text(`NETWORK_GUARD=${JSON.stringify(result)}`);
+  },
+
   async tabs_context_mcp(args) {
     const { incognito, windowId, createIfEmpty } = args;
 
